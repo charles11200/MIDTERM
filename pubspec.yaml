@@ -1,0 +1,47 @@
+name: untitled2
+description: GrabFood Inspired Food Delivery App
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # STORAGE
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # BIOMETRICS (WORKING VERSION FROM CONVERGEBIOMETRIC)
+  local_auth: ^2.3.0
+  local_auth_android: ^1.0.56
+  local_auth_ios: ^1.0.56
+
+  # NETWORK
+  http: ^1.2.0
+
+  # WEBVIEW (for payment)
+  webview_flutter: ^4.7.0
+
+  # URL launcher optional
+  url_launcher: ^6.3.0
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^4.0.0
+
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/
