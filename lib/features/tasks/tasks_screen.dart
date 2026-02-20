@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../models/task.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -9,7 +10,8 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  final tasksBox = Hive.box('tasks');
+  // ✅ Specify the type <Task> to match how it was opened in main.dart
+  final Box<Task> tasksBox = Hive.box<Task>('tasks');
 
   void _addTask() {
     final controller = TextEditingController();
@@ -36,11 +38,13 @@ class _TasksScreenState extends State<TasksScreen> {
             onPressed: () {
               final text = controller.text.trim();
               if (text.isNotEmpty) {
-                tasksBox.add({
-                  'title': text,
-                  'isDone': false,
-                  'createdAt': DateTime.now().toIso8601String(),
-                });
+                // ✅ Use Task model instead of Map
+                final newTask = Task(
+                  title: text,
+                  isDone: false,
+                  createdAt: DateTime.now(),
+                );
+                tasksBox.add(newTask);
                 Navigator.pop(context);
               }
             },
@@ -50,8 +54,8 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  void _editTask(int index, Map task) {
-    final controller = TextEditingController(text: task['title']);
+  void _editTask(int index, Task task) {
+    final controller = TextEditingController(text: task.title);
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -75,9 +79,9 @@ class _TasksScreenState extends State<TasksScreen> {
             onPressed: () {
               final text = controller.text.trim();
               if (text.isNotEmpty) {
-                final updatedTask = Map.from(task);
-                updatedTask['title'] = text;
-                tasksBox.putAt(index, updatedTask);
+                // ✅ Update using Task model properties
+                task.title = text;
+                task.save(); // HiveObject allows .save()
                 Navigator.pop(context);
               }
             },
@@ -100,7 +104,7 @@ class _TasksScreenState extends State<TasksScreen> {
       ),
       child: ValueListenableBuilder(
         valueListenable: tasksBox.listenable(),
-        builder: (context, Box box, _) {
+        builder: (context, Box<Task> box, _) {
           if (box.isEmpty) {
             return const Center(child: Text('No tasks yet. Add one!'));
           }
@@ -108,12 +112,12 @@ class _TasksScreenState extends State<TasksScreen> {
           return ListView.builder(
             itemCount: box.length,
             itemBuilder: (context, index) {
-              final task = box.getAt(index) as Map;
-              final isDone = task['isDone'] as bool;
+              final task = box.getAt(index)!;
+              final isDone = task.isDone;
 
               return CupertinoListTile(
                 title: Text(
-                  task['title'],
+                  task.title,
                   style: TextStyle(
                     decoration: isDone ? TextDecoration.lineThrough : null,
                     color: isDone ? CupertinoColors.systemGrey : null,
@@ -122,9 +126,8 @@ class _TasksScreenState extends State<TasksScreen> {
                 leading: CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: () {
-                    final updatedTask = Map.from(task);
-                    updatedTask['isDone'] = !isDone;
-                    tasksBox.putAt(index, updatedTask);
+                    task.isDone = !isDone;
+                    task.save();
                   },
                   child: Icon(
                     isDone ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
@@ -141,7 +144,7 @@ class _TasksScreenState extends State<TasksScreen> {
                     ),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      onPressed: () => tasksBox.deleteAt(index),
+                      onPressed: () => task.delete(),
                       child: const Icon(CupertinoIcons.delete, color: CupertinoColors.destructiveRed, size: 20),
                     ),
                   ],
