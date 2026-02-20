@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Icons;
 import 'package:hive_flutter/hive_flutter.dart';
 
 class TasksScreen extends StatefulWidget {

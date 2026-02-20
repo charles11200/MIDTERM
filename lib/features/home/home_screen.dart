@@ -61,11 +61,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
+                      children: [
                         Text('Restaurants', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                         Text('See all', style: TextStyle(color: CupertinoColors.systemGrey)),
                       ],

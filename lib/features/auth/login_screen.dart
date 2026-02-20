@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Icons; // ONLY icon
 import 'package:hive/hive.dart';
-import 'package:local_auth/local_auth.dart';
 
 import '../../core/biometrics.dart';
 

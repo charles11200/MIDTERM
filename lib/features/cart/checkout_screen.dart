@@ -92,7 +92,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           padding: const EdgeInsets.all(12),
           children: [
             _card(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+              child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Deliver to', style: TextStyle(fontWeight: FontWeight.w900)),
                 SizedBox(height: 6),
                 Text('Enter an address (UI only for now)', style: TextStyle(color: CupertinoColors.systemGrey)),

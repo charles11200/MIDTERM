@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 import '../../core/constants/colors.dart';
-import '../../core/widgets/safe_image.dart';
+import '../../state/address_provider.dart';
+import 'rider_simulator.dart';
 
 class TrackingScreen extends StatefulWidget {
   const TrackingScreen({super.key});
@@ -12,49 +15,53 @@ class TrackingScreen extends StatefulWidget {
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
-  // --- SIMULATION SETTINGS ---
-  static const int totalSteps = 60; // 60 updates
-  static const Duration tick = Duration(seconds: 1); // 1 step per second
-  static const int minutesPerStep = 1; // used for ETA display (tweak)
-
-  int step = 0;
+  Timer? _statusTimer;
   String status = "Order Confirmed";
 
-  Timer? _timer;
+  RiderSimulator? _sim;
 
   @override
   void initState() {
     super.initState();
 
-    // Status auto update after 1 minute (per requirement)
-    Future.delayed(const Duration(minutes: 1), () {
+    // ✅ auto update status after 1 minute
+    _statusTimer = Timer(const Duration(minutes: 1), () {
       if (!mounted) return;
       setState(() => status = "Delivery is on the way");
     });
 
-    _timer = Timer.periodic(tick, (_) {
-      if (!mounted) return;
-      setState(() {
-        step = min(step + 1, totalSteps);
+    final saved = AddressStore.instance.saved;
+    if (saved != null) {
+      final dest = LatLng(saved.lat, saved.lng);
+
+      // mock rider starts slightly away
+      final start = LatLng(dest.latitude + 0.01, dest.longitude - 0.01);
+
+      _sim = RiderSimulator(start: start, destination: dest)
+        ..buildRouteWithAStar()
+        ..startMoving(step: const Duration(milliseconds: 650));
+
+      _sim!.addListener(() {
+        if (mounted) setState(() {});
       });
-      if (step >= totalSteps) {
-        _timer?.cancel();
-      }
-    });
+    }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _statusTimer?.cancel();
+    _sim?.disposeSim();
     super.dispose();
   }
 
-  // --- ETA CALCULATION (Arriving by time) ---
   String arrivingByText() {
-    final remaining = max(0, totalSteps - step);
-    final remainingMinutes = max(1, (remaining * minutesPerStep) ~/ 10); // tweak feel
+    final sim = _sim;
+    if (sim == null || sim.route.isEmpty) return "Arriving soon";
+
+    // estimate remaining steps from route progress
+    final remaining = max(0, sim.route.length - 1);
     final now = DateTime.now();
-    final eta = now.add(Duration(minutes: remainingMinutes));
+    final eta = now.add(Duration(minutes: max(1, remaining ~/ 12)));
 
     int hour = eta.hour;
     final minute = eta.minute.toString().padLeft(2, '0');
@@ -65,90 +72,64 @@ class _TrackingScreenState extends State<TrackingScreen> {
     return "Arriving by $hour:$minute ${isPm ? "PM" : "AM"}";
   }
 
-  double progress() => step / totalSteps;
-
   @override
   Widget build(BuildContext context) {
+    final saved = AddressStore.instance.saved;
+    final sim = _sim;
+
+    if (saved == null || sim == null) {
+      return const CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(middle: Text("Tracking")),
+        child: SafeArea(
+          child: Center(
+            child: Text("Set your Saved Address first in Profile."),
+          ),
+        ),
+      );
+    }
+
+    final dest = LatLng(saved.lat, saved.lng);
+
+    final markers = <Marker>{
+      Marker(markerId: const MarkerId("dest"), position: dest),
+      Marker(
+        markerId: const MarkerId("rider"),
+        position: sim.rider,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      ),
+    };
+
+    final polylines = <Polyline>{
+      Polyline(
+        polylineId: const PolylineId("route"),
+        points: sim.route,
+        width: 6,
+        color: const Color(0xFF00C853),
+      ),
+    };
+
     return CupertinoPageScaffold(
       child: Stack(
         children: [
-          // FAKE MAP BACKGROUND (use your own map screenshot if you want)
           Positioned.fill(
-            child: SafeAssetImage(
-              path: "assets/images/banners/promo1.jpg", // replace with your own map-like image if you want
-              fit: BoxFit.cover,
-              radius: 0,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(target: dest, zoom: 15),
+              markers: markers,
+              polylines: polylines,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
             ),
           ),
 
-          // GREEN ROUTE (fake polyline)
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _RoutePainter(progress: progress()),
-            ),
-          ),
-
-          // RIDER ICON moving
-          Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final w = c.maxWidth;
-                final h = c.maxHeight;
-
-                // Simple route curve points (fake)
-                final start = Offset(w * 0.15, h * 0.65);
-                final end = Offset(w * 0.70, h * 0.25);
-
-                // interpolate along curve
-                final t = progress();
-                final p = Offset(
-                  lerpDouble(start.dx, end.dx, t),
-                  lerpDouble(start.dy, end.dy, t),
-                );
-
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: p.dx - 22,
-                      top: p.dy - 22,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.white,
-                          borderRadius: BorderRadius.circular(22),
-                          boxShadow: const [
-                            BoxShadow(
-                              blurRadius: 12,
-                              offset: Offset(0, 6),
-                              color: Color(0x33000000),
-                            )
-                          ],
-                        ),
-                        child: const Icon(
-                          CupertinoIcons.car_detailed,
-                          color: AppColors.grabGreen,
-                          size: 26,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-
-          // BOTTOM CARD (like Grab)
           Align(
             alignment: Alignment.bottomCenter,
             child: _BottomGrabCard(
               arrivingBy: arrivingByText(),
               status: status,
-              progress: progress(),
+              progress: sim.route.isEmpty ? 0 : 1, // just visual; rider movement is shown on map
             ),
           ),
 
-          // TOP BACK BUTTON
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
@@ -228,10 +209,7 @@ class _BottomGrabCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             arrivingBy,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           RichText(
@@ -240,24 +218,16 @@ class _BottomGrabCard extends StatelessWidget {
               children: [
                 const TextSpan(
                   text: "On time · ",
-                  style: TextStyle(
-                    color: AppColors.grabGreen,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: AppColors.grabGreen, fontWeight: FontWeight.w900),
                 ),
                 TextSpan(
                   text: status,
-                  style: const TextStyle(
-                    color: CupertinoColors.systemGrey,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: const TextStyle(color: CupertinoColors.systemGrey, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
-
-          // progress bar (like your screenshot line)
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Container(
@@ -265,83 +235,13 @@ class _BottomGrabCard extends StatelessWidget {
               color: CupertinoColors.systemGrey5,
               child: FractionallySizedBox(
                 alignment: Alignment.centerLeft,
-                widthFactor: progress.clamp(0, 1),
+                widthFactor: 0.7, // purely visual; map shows actual movement
                 child: Container(color: AppColors.grabGreen),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-
-          // icons row
-          Row(
-            children: const [
-              Icon(CupertinoIcons.person, size: 18, color: AppColors.grabGreen),
-              SizedBox(width: 8),
-              Expanded(child: _SmallDotLine()),
-              Icon(CupertinoIcons.bag, size: 18, color: AppColors.grabGreen),
-              SizedBox(width: 8),
-              Expanded(child: _SmallDotLine()),
-              Icon(CupertinoIcons.car_detailed, size: 18, color: AppColors.grabGreen),
-              SizedBox(width: 8),
-              Expanded(child: _SmallDotLine()),
-              Icon(CupertinoIcons.house_fill, size: 18, color: CupertinoColors.systemGrey),
-            ],
           ),
         ],
       ),
     );
   }
 }
-
-class _SmallDotLine extends StatelessWidget {
-  const _SmallDotLine();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 2,
-      color: CupertinoColors.systemGrey4,
-    );
-  }
-}
-
-class _RoutePainter extends CustomPainter {
-  _RoutePainter({required this.progress});
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.grabGreen
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final w = size.width;
-    final h = size.height;
-
-    final path = Path()
-      ..moveTo(w * 0.15, h * 0.65)
-      ..lineTo(w * 0.30, h * 0.55)
-      ..lineTo(w * 0.45, h * 0.60)
-      ..lineTo(w * 0.55, h * 0.40)
-      ..lineTo(w * 0.70, h * 0.25);
-
-    // draw only partial route (progress)
-    final metrics = path.computeMetrics().toList();
-    if (metrics.isEmpty) return;
-
-    final metric = metrics.first;
-    final len = metric.length * progress.clamp(0, 1);
-    final partial = metric.extractPath(0, len);
-
-    canvas.drawPath(partial, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _RoutePainter oldDelegate) =>
-      oldDelegate.progress != progress;
-}
-
-double lerpDouble(double a, double b, double t) => a + (b - a) * t;

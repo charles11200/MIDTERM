@@ -2,6 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../auth/login_screen.dart';
+import '../../state/address_provider.dart';
+import 'address_picker_screen.dart';
+import '../../models/saved_address.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -49,43 +52,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _editAddress() {
-    final controller = TextEditingController(
-      text: box.get('deliveryAddress', defaultValue: 'Enter an address'),
-    );
-
-    showCupertinoDialog(
-      context: context,
-      builder: (_) => CupertinoAlertDialog(
-        title: const Text("Delivery Address"),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: "Enter address",
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text("Cancel"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            child: const Text("Save"),
-            onPressed: () {
-              box.put(
-                'deliveryAddress',
-                controller.text.trim().isEmpty ? "Enter an address" : controller.text.trim(),
-              );
-              Navigator.pop(context);
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   void logout() {
     showCupertinoDialog(
       context: context,
@@ -104,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pushAndRemoveUntil(
                 context,
                 CupertinoPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
+                    (route) => false,
               );
             },
           ),
@@ -116,8 +82,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final biometrics = box.get('biometrics', defaultValue: true);
-    final address = box.get('deliveryAddress', defaultValue: 'Enter an address');
     final balance = box.get('balance', defaultValue: 0.0);
+
+    final saved = AddressStore.instance.saved;
 
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
@@ -126,7 +93,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: SafeArea(
         child: ListView(
           children: [
-            /// BALANCE & SECURITY
             CupertinoListSection.insetGrouped(
               header: const Text("Account & Security"),
               children: [
@@ -149,27 +115,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
 
-            /// ADDRESS
             CupertinoListSection.insetGrouped(
               header: const Text("Delivery"),
               children: [
                 CupertinoListTile(
-                  title: const Text("Delivery Address"),
-                  additionalInfo: Text(address),
+                  title: const Text("Saved Address"),
+                  additionalInfo: Text(
+                    saved == null
+                        ? "Not set"
+                        : "${saved.label} • ${saved.addressLine}",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: const Icon(CupertinoIcons.chevron_right),
-                  onTap: _editAddress,
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (_) => AddressPickerScreen(initial: saved),
+                      ),
+                    );
+
+                    if (result is SavedAddress) {
+                      await AddressStore.instance.save(result);
+                      setState(() {});
+                    }
+                  },
                 ),
               ],
             ),
 
-            /// LOGOUT
             CupertinoListSection.insetGrouped(
               children: [
                 CupertinoListTile(
-                  leading: const Icon(CupertinoIcons.square_arrow_right, color: CupertinoColors.systemRed),
+                  leading: const Icon(
+                    CupertinoIcons.square_arrow_right,
+                    color: CupertinoColors.systemRed,
+                  ),
                   title: const Text(
                     "Log Out",
-                    style: TextStyle(color: CupertinoColors.systemRed, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: CupertinoColors.systemRed,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   onTap: logout,
                 ),
