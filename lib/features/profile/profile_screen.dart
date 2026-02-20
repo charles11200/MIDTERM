@@ -16,42 +16,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final box = Hive.box('database');
 
-  void _editBalance() {
-    final controller = TextEditingController(
-      text: box.get('balance', defaultValue: 0.0).toString(),
-    );
-
-    showCupertinoDialog(
-      context: context,
-      builder: (_) => CupertinoAlertDialog(
-        title: const Text("Current Balance"),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            placeholder: "Enter amount",
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text("Cancel"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoDialogAction(
-            child: const Text("Save"),
-            onPressed: () {
-              final amount = double.tryParse(controller.text) ?? 0.0;
-              box.put('balance', amount);
-              Navigator.pop(context);
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   void logout() {
     showCupertinoDialog(
       context: context,
@@ -82,8 +46,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final biometrics = box.get('biometrics', defaultValue: true);
-    final balance = box.get('balance', defaultValue: 0.0);
-
     final saved = AddressStore.instance.saved;
 
     return CupertinoPageScaffold(
@@ -96,12 +58,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             CupertinoListSection.insetGrouped(
               header: const Text("Account & Security"),
               children: [
-                CupertinoListTile(
-                  title: const Text("Current Balance"),
-                  additionalInfo: Text("₱${balance.toStringAsFixed(2)}"),
-                  trailing: const Icon(CupertinoIcons.pencil),
-                  onTap: _editBalance,
-                ),
                 CupertinoListTile(
                   title: const Text("Enable Biometrics"),
                   trailing: CupertinoSwitch(
