@@ -17,7 +17,7 @@ Future<void> main() async {
 
   // ✅ Open boxes (order matters)
   await Hive.openBox('database');          // for balance, biometrics, saved_address
-  await Hive.openBox<Task>('tasks');       // typed box for Task asasdsadasdcscafa
+  await Hive.openBox<Task>('tasks');       // typed box for Task asasdsadasdcscafascasc
 
   // ✅ Load saved address from Hive
   await AddressStore.instance.init();
